@@ -18,6 +18,12 @@ const int MSG_MAX = PATH_MAX + 100;
 #define MAX_ARGUMENTS 100
 #define MAX_CMD 100
 
+// Good reference http://www.cs.loyola.edu/~jglenn/702/S2005/Examples/dup2.html
+
+void ml8_logger(char *str) {
+//    printf("\n%s\n", str);
+}
+
 double parse_timeval(struct timeval tv) {
     return (double) (tv.tv_usec) / 1000000 +
            (double) (tv.tv_sec);
@@ -69,10 +75,16 @@ void handle_fork_err(char *cmd) {
 }
 
 void close_everything(int fd_read[2], int fd_write[2]) {
-    close(fd_read[READ_END]);
-    close(fd_read[WRITE_END]);
-    close(fd_write[READ_END]);
-    close(fd_write[WRITE_END]);
+//    if (fd_read != NULL) {
+//        ml8_logger("closing fd_read");
+//        close(fd_read[READ_END]);
+//        close(fd_read[WRITE_END]);
+//    }
+//    if (fd_write != NULL) {
+//        ml8_logger("closing fd_write");
+//        close(fd_write[READ_END]);
+//        close(fd_write[WRITE_END]);
+//    }
 }
 
 void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
@@ -85,8 +97,12 @@ void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
         pid = fork();
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
-            dup2(fd_read[READ_END], STDIN_FILENO);
-            dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            if (fd_read != NULL) {
+                dup2(fd_read[READ_END], STDIN_FILENO);
+            }
+            if (fd_write != NULL) {
+                dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            }
             close_everything(fd_read, fd_write);
             execv(executable_path, argv);
             handle_exec_err(executable_path);
@@ -103,8 +119,12 @@ void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
         pid = fork();
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
-            dup2(fd_read[READ_END], STDIN_FILENO);
-            dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            if (fd_read != NULL) {
+                dup2(fd_read[READ_END], STDIN_FILENO);
+            }
+            if (fd_write != NULL) {
+                dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            }
             close_everything(fd_read, fd_write);
             execvp(argv[0], argv);
             handle_exec_err(argv[0]);
@@ -119,18 +139,40 @@ void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
 }
 
 int main(int argc, char *argv[]) {
+//    signal(SIGTRAP, SIG_IGN);
     signal(SIGINT, SIG_IGN);
     if (argc <= 1) {
         return 0;
     }
     char *command_to_execute[MAX_ARGUMENTS];
+    char index_command_to_execute = 0;
     int current_command = 0;
     int *all_fds[MAX_CMD];
+//    int first_fd[2];
+//    pipe(first_fd);
+    all_fds[0] = NULL;
     for (int i = 1; i < argc; i++) {
-        if (argv[i][0]!='!'){
+        if (*argv[i] == '!' && *(argv[i] + 1) == '\0') {
+            int next_fd[2];
+            pipe(next_fd);
+            all_fds[current_command + 1] = next_fd;
+            printf("%d %d", next_fd[0], next_fd[1]);
+            command_to_execute[index_command_to_execute] = NULL;
 
-        }else{
-            run_command(command_to_execute,)
+            run_command(command_to_execute, all_fds[0],
+                        all_fds[current_command + 1]);
+            current_command++;
+            index_command_to_execute = 0;
+        } else {
+            command_to_execute[index_command_to_execute] = argv[i];
+            index_command_to_execute++;
         }
     }
+//    close_everything(all_fds[current_command], NULL);
+    command_to_execute[index_command_to_execute] = NULL;
+    run_command(command_to_execute, all_fds[current_command], NULL);
+    close(all_fds[current_command][0]);
+    close(all_fds[current_command][1]);
+    current_command++;
+    index_command_to_execute = 0;
 }
