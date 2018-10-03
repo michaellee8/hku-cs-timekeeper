@@ -13,6 +13,10 @@
 
 const int MSG_MAX = PATH_MAX + 100;
 
+#define READ_END 0
+#define WRITE_END 1
+#define MAX_ARGUMENTS 100
+#define MAX_CMD 100
 
 double parse_timeval(struct timeval tv) {
     return (double) (tv.tv_usec) / 1000000 +
@@ -64,7 +68,14 @@ void handle_fork_err(char *cmd) {
     perror(msg);
 }
 
-void run_command(char *argv[],int fd_read[2],int fd_write[2]) {
+void close_everything(int fd_read[2], int fd_write[2]) {
+    close(fd_read[READ_END]);
+    close(fd_read[WRITE_END]);
+    close(fd_write[READ_END]);
+    close(fd_write[WRITE_END]);
+}
+
+void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
     pid_t pid;
     if (*argv[0] == '/' || *argv[0] == '.') {
         char executable_path[PATH_MAX];
@@ -74,11 +85,16 @@ void run_command(char *argv[],int fd_read[2],int fd_write[2]) {
         pid = fork();
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
+            dup2(fd_read[READ_END], STDIN_FILENO);
+            dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            close_everything(fd_read, fd_write);
             execv(executable_path, argv);
             handle_exec_err(executable_path);
         } else if (pid < 0) {
+            close_everything(fd_read, fd_write);
             handle_fork_err(executable_path);
         } else {
+            close_everything(fd_read, fd_write);
             handle_process_created(pid, executable_path, start_time);
         }
     } else {
@@ -87,11 +103,16 @@ void run_command(char *argv[],int fd_read[2],int fd_write[2]) {
         pid = fork();
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
+            dup2(fd_read[READ_END], STDIN_FILENO);
+            dup2(fd_write[WRITE_END], STDOUT_FILENO);
+            close_everything(fd_read, fd_write);
             execvp(argv[0], argv);
             handle_exec_err(argv[0]);
         } else if (pid < 0) {
+            close_everything(fd_read, fd_write);
             handle_fork_err(argv[0]);
         } else {
+            close_everything(fd_read, fd_write);
             handle_process_created(pid, argv[0], start_time);
         }
     }
@@ -102,5 +123,14 @@ int main(int argc, char *argv[]) {
     if (argc <= 1) {
         return 0;
     }
-    run_command(argv + 1);
+    char *command_to_execute[MAX_ARGUMENTS];
+    int current_command = 0;
+    int *all_fds[MAX_CMD];
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0]!='!'){
+
+        }else{
+            run_command(command_to_execute,)
+        }
+    }
 }
