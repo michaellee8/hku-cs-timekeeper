@@ -12,7 +12,7 @@
 void handle_process_created(pid_t pid, char *cmd) {
     printf("Process %d created with command %\n", (int) pid, cmd);
     int status;
-    waitpid(pid, &status, 0)
+    waitpid(pid, &status, 0);
 }
 
 void run_command(char *argv[]) {
