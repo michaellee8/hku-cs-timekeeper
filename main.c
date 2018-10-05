@@ -98,9 +98,11 @@ void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
             if (fd_read != NULL) {
+                close(fd_read[WRITE_END]);
                 dup2(fd_read[READ_END], STDIN_FILENO);
             }
             if (fd_write != NULL) {
+                close(fd_write[READ_END]);
                 dup2(fd_write[WRITE_END], STDOUT_FILENO);
             }
             close_everything(fd_read, fd_write);
@@ -120,9 +122,11 @@ void run_command(char *argv[], int fd_read[2], int fd_write[2]) {
         if (pid == 0) {
             signal(SIGINT, SIG_DFL);
             if (fd_read != NULL) {
+                close(fd_read[WRITE_END]);
                 dup2(fd_read[READ_END], STDIN_FILENO);
             }
             if (fd_write != NULL) {
+                close(fd_write[READ_END]);
                 dup2(fd_write[WRITE_END], STDOUT_FILENO);
             }
             close_everything(fd_read, fd_write);
