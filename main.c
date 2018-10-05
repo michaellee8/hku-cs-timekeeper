@@ -145,7 +145,6 @@ void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
                 }
             }
         } else { // Normal commands
-
             dup2(pipes[i_cmd - 1][READ_END], STDIN_FILENO);
             dup2(pipes[i_cmd][WRITE_END], STDOUT_FILENO);
             // Close all pipes except dup-ed one
@@ -170,6 +169,8 @@ void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
     } else if (pid < 0) { // Fork error
         handle_fork_err(executable_path);
     } else { // Parent process
+
+        // Parent close pipes that are consumed by child
         if (n_pipes == 0) { // No pipes for 1 command
             // Do nothing
         } else if (i_cmd == 0) { // First command
@@ -179,11 +180,10 @@ void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
             close(pipes[i_cmd - 1][READ_END]);
 
         } else { // Normal commands
-
             close(pipes[i_cmd - 1][READ_END]);
             close(pipes[i_cmd][WRITE_END]);
-
         }
+
         handle_process_created(pid, executable_path, start_time); // Do the timekeeping things
 
     }
@@ -232,11 +232,5 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < n_cmds; i++) {
         run_command(all_cmds[i], i, pipes, n_cmds - 1);
     }
-
-    // Close all pipes in parent process
-//    for (int i = 0; i < n_cmds - 1; i++) {
-//        close(pipes[i][READ_END]);
-//        close(pipes[i][WRITE_END]);
-//    }
 
 }
