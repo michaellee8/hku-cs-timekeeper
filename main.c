@@ -95,7 +95,7 @@ void handle_fork_err(char *cmd) {
 void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
 
     pid_t pid;
-    bool from_path = false;
+    bool from_path;
     char executable_path[PATH_MAX];
 
     // Find the executable out if necessary
@@ -145,12 +145,13 @@ void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
                 }
             }
         } else { // Normal commands
-            dup2(pipes[i_cmd][WRITE_END], STDOUT_FILENO);
+
             dup2(pipes[i_cmd - 1][READ_END], STDIN_FILENO);
+            dup2(pipes[i_cmd][WRITE_END], STDOUT_FILENO);
             // Close all pipes except dup-ed one
             for (int i = 0; i < n_pipes; i++) {
                 for (int j = 0; j < 2; j++) {
-                    if (i == i_cmd - 1 && j == READ_END || i == i_cmd && j == WRITE_END) {
+                    if ((i == i_cmd - 1 && j == READ_END) || (i == i_cmd && j == WRITE_END)) {
                         // Do nothing
                     } else {
                         close(pipes[i][j]);
@@ -169,7 +170,22 @@ void run_command(char *argv[], int i_cmd, int pipes[][2], int n_pipes) {
     } else if (pid < 0) { // Fork error
         handle_fork_err(executable_path);
     } else { // Parent process
+        if (n_pipes == 0) { // No pipes for 1 command
+            // Do nothing
+        } else if (i_cmd == 0) { // First command
+            close(pipes[i_cmd][WRITE_END]);
+
+        } else if (i_cmd == n_pipes) {// Last command
+            close(pipes[i_cmd - 1][READ_END]);
+
+        } else { // Normal commands
+
+            close(pipes[i_cmd - 1][READ_END]);
+            close(pipes[i_cmd][WRITE_END]);
+
+        }
         handle_process_created(pid, executable_path, start_time); // Do the timekeeping things
+
     }
 }
 
@@ -184,35 +200,26 @@ int main(int argc, char *argv[]) {
     }
 
     // Define spaces to place the commands
-    char *current_cmd[MAX_ARGUMENTS];
+//    char *current_cmd[MAX_ARGUMENTS];
     char current_cmd_tail = 0;
-    char **all_cmds[MAX_CMD];
+    char *all_cmds[MAX_CMD][MAX_ARGUMENTS];
     int n_cmds = 0;
 
 
     // Parse all non-tail commands
     for (int i = 1; i < argc; i++) {
         if (*argv[i] == '!' && *(argv[i] + 1) == '\0') {
-            current_cmd[current_cmd_tail] = NULL;
-
-            // Copy all string pointers from current command to new command so it can be reused
-            char *new_cmd[MAX_ARGUMENTS];
-            for (int i = 0; i < current_cmd_tail + 1; i++) {
-                new_cmd[i] = current_cmd[i];
-            }
-
-            all_cmds[n_cmds] = new_cmd;
+            all_cmds[n_cmds][current_cmd_tail] = NULL;
             n_cmds++;
             current_cmd_tail = 0;
         } else {
-            current_cmd[current_cmd_tail] = argv[i];
+            all_cmds[n_cmds][current_cmd_tail] = argv[i];
             current_cmd_tail++;
         }
     }
 
     // Clean-up: Parse last command
-    current_cmd[current_cmd_tail] = NULL;
-    all_cmds[n_cmds] = current_cmd;
+    all_cmds[n_cmds][current_cmd_tail] = NULL;
     n_cmds++;
 
     // Generate (n_cmds - 1) pipes
@@ -227,9 +234,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Close all pipes in parent process
-    for (int i = 0; i < n_cmds - 1; i++) {
-        close(pipes[i][READ_END]);
-        close(pipes[i][WRITE_END]);
-    }
+//    for (int i = 0; i < n_cmds - 1; i++) {
+//        close(pipes[i][READ_END]);
+//        close(pipes[i][WRITE_END]);
+//    }
 
 }
